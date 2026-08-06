@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+
+# runtime data — settings.json holds provider API keys
+backend/data/
+
+# local environment
+.env
+.env.local
+*.local
+
+# logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# os / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

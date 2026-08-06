@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e12">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>HERA</title>
+<script>
+  /* Set the real viewport height BEFORE first paint so the layout is never
+     taller than the visible screen (mobile URL bars lie about 100vh).
+     CSS falls back to 100dvh -> 100vh if this never runs. */
+  (function(){
+    var d=document.documentElement;
+    function h(){
+      var vv=window.visualViewport;
+      d.style.setProperty('--app-h',(vv?vv.height:window.innerHeight)+'px');
+      /* soft keyboard is up if the visual viewport shrank a lot */
+      if(vv) d.classList.toggle('kb-open', window.innerHeight-vv.height > 150);
+    }
+    h();
+    window.addEventListener('resize',h,{passive:true});
+    window.addEventListener('orientationchange',h,{passive:true});
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize',h,{passive:true});
+      window.visualViewport.addEventListener('scroll',h,{passive:true});
+    }
+  })();
+</script>
+<style>
+  /* ===== HERA - rack console ===== */
+  :root{
+    --rack:#0a0e12; --panel:#11161c; --panel-2:#161d25;
+    --edge:#232d38; --edge-lit:#2f3d4a;
+    --text:#c7d2dc; --text-dim:#6b7a89;
+    --phosphor:#ffb347; --phosphor-lo:#7a5320;
+    --live:#4ade80; --warn:#fbbf24; --down:#f87171; --user-ink:#8fb8d8;
+    --mono:"JetBrains Mono","SF Mono","Fira Code",ui-monospace,Consolas,monospace;
+    --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-t:env(safe-area-inset-top,0px);
+    --safe-l:env(safe-area-inset-left,0px);
+    --safe-r:env(safe-area-inset-right,0px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{height:100%}
+  body{
+    background:radial-gradient(1200px 600px at 50% -10%,#12191f,var(--rack) 60%),var(--rack);
+    color:var(--text);font-family:var(--mono);font-size:14px;
+    display:flex;justify-content:center;align-items:stretch;padding:18px;overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+    overscroll-behavior:none;                 /* kill pull-to-refresh / rubber-band */
+    /* progressive cascade: last one the browser understands wins */
+    height:100vh;
+    height:100dvh;
+    height:var(--app-h,100dvh);
+  }
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+    background:repeating-linear-gradient(to bottom,rgba(255,255,255,.015) 0 1px,transparent 1px 3px);
+    mix-blend-mode:overlay}
+
+  .unit{width:100%;max-width:1180px;height:100%;min-height:0;
+    background:linear-gradient(180deg,var(--panel),#0d1319);
+    border:1px solid var(--edge);border-radius:10px;
+    box-shadow:0 0 0 1px #05080b,0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.03);
+    display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .screw{position:absolute;width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 35%,#3a4652,#161c22 70%);
+    box-shadow:inset 0 0 0 1px #05090c;top:12px}
+  .screw.l{left:12px}.screw.r{right:12px}
+
+  /* faceplate */
+  .face{flex:0 0 auto;display:flex;align-items:center;gap:16px;padding:14px 46px;
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));border-bottom:1px solid var(--edge)}
+  .mark{display:flex;align-items:baseline;gap:10px;min-width:0}
+  .mark .logo{font-weight:800;letter-spacing:4px;font-size:22px;color:var(--phosphor);
+    text-shadow:0 0 14px rgba(255,179,71,.45);white-space:nowrap}
+  .mark .sub{font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase}
+  .rule{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--edge-lit),transparent)}
+  .leds{display:flex;gap:18px;align-items:center;flex-shrink:0}
+  .led{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:1px;
+    color:var(--text-dim);text-transform:uppercase;white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--down);flex:0 0 auto;
+    box-shadow:0 0 6px currentColor;color:var(--down)}
+  .dot.on{background:var(--live);color:var(--live);animation:pulse 2.4s infinite}
+  .dot.idle{background:var(--phosphor-lo);color:var(--phosphor-lo);box-shadow:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  /* body: nav rail + view */
+  .main{flex:1 1 auto;display:flex;min-height:0;min-width:0}
+  .rail{flex:0 0 160px;border-right:1px solid var(--edge);
+    background:linear-gradient(180deg,var(--panel),#0c1116);padding:16px 0;
+    display:flex;flex-direction:column;gap:2px}
+  .nav{display:flex;align-items:center;gap:10px;padding:11px 20px;color:var(--text-dim);
+    font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;
+    border-left:2px solid transparent;transition:color .12s,background .12s,border-color .12s;
+    touch-action:manipulation;-webkit-user-select:none;user-select:none}
+  .nav:hover{color:var(--text);background:rgba(255,255,255,.02)}
+  .nav:focus-visible{outline:1px solid var(--phosphor-lo);outline-offset:-2px}
+  .nav.active{color:var(--phosphor);border-left-color:var(--phosphor);
+    background:linear-gradient(90deg,rgba(255,179,71,.06),transparent)}
+  .nav .ic{width:14px;text-align:center;flex:0 0 auto}
+  .rail .spacer{flex:1}
+  .rail .foot{padding:12px 20px;font-size:9px;color:var(--text-dim);letter-spacing:1px}
+
+  .view{flex:1 1 auto;min-width:0;min-height:0;display:none;flex-direction:column}
+  .view.active{display:flex}
+
+  /* ---- Chat view ---- */
+  .screen{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:22px 40px;
+    background:radial-gradient(900px 400px at 50% 0%,rgba(255,179,71,.03),transparent 70%);
+    scrollbar-width:thin;scrollbar-color:var(--edge) transparent;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .screen::-webkit-scrollbar{width:8px}
+  .screen::-webkit-scrollbar-thumb{background:var(--edge);border-radius:4px}
+  .boot{color:var(--text-dim);font-size:11px;line-height:1.9;margin-bottom:20px;
+    border-left:2px solid var(--phosphor-lo);padding-left:12px;overflow-wrap:anywhere}
+  .boot .ok{color:var(--live)}.boot .hera{color:var(--phosphor)}
+  .entry{margin:0 0 18px;display:flex;gap:14px}
+  .entry .body{flex:1 1 auto;min-width:0}   /* min-width:0 = long words wrap instead of blowing out the row */
+  .gutter{flex:0 0 66px;text-align:right;color:var(--text-dim);font-size:10px;padding-top:3px}
+  .who{font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
+  .who.hera{color:var(--phosphor)}.who.op{color:var(--user-ink)}
+  .who .ts{display:none;color:var(--text-dim);letter-spacing:1px;margin-left:8px}
+  .msg{line-height:1.65;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+  .entry.op{background:linear-gradient(90deg,rgba(143,184,216,.05),transparent);
+    border-left:2px solid #35485c;padding:8px 0 8px 12px;margin-left:52px;border-radius:2px}
+  .entry.op .gutter{flex-basis:14px}
+  .caret{display:inline-block;width:8px;height:15px;background:var(--phosphor);
+    vertical-align:-2px;margin-left:2px;animation:blink 1.1s steps(1) infinite;box-shadow:0 0 8px var(--phosphor)}
+  @keyframes blink{50%{opacity:0}}
+  .bar{flex:0 0 auto;border-top:1px solid var(--edge);
+    background:linear-gradient(180deg,var(--panel),#0c1116);padding:14px 40px 16px}
+  .prompt{display:flex;align-items:center;gap:12px;background:var(--rack);
+    border:1px solid var(--edge);border-radius:6px;padding:11px 14px;transition:.15s}
+  .prompt:focus-within{border-color:var(--phosphor-lo);box-shadow:0 0 0 1px var(--phosphor-lo),0 0 18px rgba(255,179,71,.08)}
+  .sigil{color:var(--phosphor);font-weight:700;text-shadow:0 0 8px rgba(255,179,71,.5);flex:0 0 auto}
+  .prompt input{flex:1 1 auto;min-width:0;background:transparent;border:none;outline:none;
+    color:var(--text);font-family:var(--mono);font-size:14px}
+  .prompt input::placeholder{color:var(--text-dim)}
+  .send{background:transparent;border:1px solid var(--edge-lit);color:var(--text-dim);
+    font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    padding:6px 12px;border-radius:4px;cursor:pointer;transition:.15s;flex:0 0 auto;
+    touch-action:manipulation}
+  .send:hover{color:var(--phosphor);border-color:var(--phosphor-lo)}
+
+  /* ---- generic panel views (dashboard/settings/integrations) ---- */
+  .pad{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:28px 40px;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+    scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
+  .pad::-webkit-scrollbar{width:8px}
+  .pad::-webkit-scrollbar-thumb{background:var(--edge);border-radius:4px}
+  .h{font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--phosphor);margin-bottom:4px}
+  .hsub{font-size:11px;color:var(--text-dim);margin-bottom:22px}
+  .card{background:var(--panel-2);border:1px solid var(--edge);border-radius:8px;padding:18px 20px;margin-bottom:16px}
+  .card h3{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+  .stat{background:var(--rack);border:1px solid var(--edge);border-radius:6px;padding:14px;min-width:0}
+  .stat .k{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+  .stat .v{font-size:18px;color:var(--phosphor);overflow-wrap:anywhere}
+  .field{margin-bottom:12px;min-width:0}
+  .field label{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:5px}
+  .field input,.field select{width:100%;max-width:100%;background:var(--rack);border:1px solid var(--edge);
+    border-radius:5px;padding:9px 11px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none}
+  .field input:focus{border-color:var(--phosphor-lo)}
+  .row{display:flex;gap:10px}.row .field{flex:1 1 0;min-width:0}
+  .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
+  .btn{background:transparent;border:1px solid var(--edge-lit);color:var(--text);
+    font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    padding:8px 14px;border-radius:5px;cursor:pointer;transition:.15s;touch-action:manipulation}
+  .btn:hover{border-color:var(--phosphor-lo);color:var(--phosphor)}
+  .btn.p{border-color:var(--phosphor-lo);color:var(--phosphor)}
+  .provider{display:flex;align-items:center;gap:12px;background:var(--rack);
+    border:1px solid var(--edge);border-radius:6px;padding:12px 14px;margin-bottom:10px}
+  .provider .pn{flex:1 1 auto;min-width:0}
+  .provider .pn .nm{color:var(--text);font-size:13px;overflow-wrap:anywhere}
+  .provider .pn .md{color:var(--text-dim);font-size:10px;margin-top:2px;overflow-wrap:anywhere}
+  .pill{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:10px;
+    border:1px solid var(--edge-lit);color:var(--text-dim);flex:0 0 auto;white-space:nowrap}
+  .pill.up{color:var(--live);border-color:var(--live)}
+  .pill.down{color:var(--down);border-color:var(--down)}
+  .integ{display:flex;align-items:center;gap:14px;opacity:.55}
+  .integ .soon{margin-left:auto;font-size:9px;letter-spacing:1px;color:var(--text-dim);
+    border:1px dashed var(--edge-lit);padding:3px 8px;border-radius:10px;flex:0 0 auto;white-space:nowrap}
+
+  /* ============ MOBILE ============
+     Phones + landscape phones: full-bleed unit, nav rail becomes a bottom tab
+     bar, bigger touch targets, condensed faceplate. Desktop is untouched. */
+  @media (max-width:760px), (orientation:landscape) and (max-height:520px){
+    body{padding:0}
+    .unit{max-width:none;border-radius:0;border:none;height:100%}
+    .screw{display:none}
+    body::after{display:none}   /* scanline blend layer costs a full-screen repaint per scroll frame */
+
+    /* faceplate: one compact row, notch-aware */
+    .face{gap:12px;padding:calc(10px + var(--safe-t)) calc(14px + var(--safe-r)) 10px calc(14px + var(--safe-l))}
+    .mark .logo{font-size:18px;letter-spacing:3px}
+    .mark .sub{display:none}
+    .rule{display:none}
+    .leds{margin-left:auto;gap:12px}
+    .led{font-size:9px;gap:5px}
+    .led .st{display:none}      /* just the dot + "local"/"cloud" */
+
+    /* body: stack vertically, rail becomes a bottom tab bar */
+    .main{flex-direction:column}
+    .rail{flex:0 0 auto;flex-direction:row;order:2;border-right:none;
+      border-top:1px solid var(--edge);gap:0;justify-content:space-around;
+      padding:0 var(--safe-r) var(--safe-b) var(--safe-l)}
+    .rail .spacer,.rail .foot{display:none}
+    .nav{flex:1 1 0;flex-direction:column;gap:3px;justify-content:center;align-items:center;
+      min-height:54px;padding:8px 2px;font-size:9px;letter-spacing:.5px;border-left:none;
+      border-top:2px solid transparent;text-align:center}
+    .nav.active{border-left:none;border-top-color:var(--phosphor);
+      background:linear-gradient(180deg,rgba(255,179,71,.08),transparent)}
+    .nav .ic{font-size:16px;width:auto;line-height:1}
+    /* keyboard up = reclaim the tab bar's height for the message list */
+    .kb-open .rail{display:none}
+
+    .view{order:1;flex:1 1 auto;min-height:0}
+
+    /* chat: drop the timestamp gutter, move the stamp inline -> ~55px more text width */
+    .screen{padding:14px calc(14px + var(--safe-r)) 14px calc(14px + var(--safe-l))}
+    .gutter{display:none}
+    .who .ts{display:inline}
+    .entry{gap:0;margin-bottom:16px}
+    .entry.op{margin-left:16px}
+    .bar{padding:10px calc(12px + var(--safe-r)) 10px calc(12px + var(--safe-l))}
+    .prompt{padding:8px 10px;gap:9px}
+    .prompt input{font-size:16px}          /* >=16px stops iOS zoom-on-focus */
+    .send{padding:10px 12px;min-height:40px}
+
+    /* panels */
+    .pad{padding:18px calc(14px + var(--safe-r)) 24px calc(14px + var(--safe-l))}
+    .grid{grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
+    .card{padding:16px 14px}
+    .row{flex-direction:column;gap:0}
+    .field input,.field select{font-size:16px;padding:11px}   /* no iOS zoom + fat-finger target */
+    .btn{padding:11px 16px;min-height:42px}
+    .provider{flex-wrap:wrap;padding:12px}
+    .integ .soon{margin-left:auto}
+  }
+
+  /* very narrow phones */
+  @media (max-width:380px){
+    .mark .logo{font-size:16px;letter-spacing:2px}
+    .led{font-size:8px}
+    .grid{grid-template-columns:1fr 1fr}
+    .nav{font-size:8px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+  <div class="unit">
+    <span class="screw l"></span><span class="screw r"></span>
+
+    <div class="face">
+      <div class="mark"><span class="logo" id="brand">HERA</span>
+        <span class="sub">homelab environment<br>&amp; resource assistant</span></div>
+      <div class="rule"></div>
+      <div class="leds" id="leds">
+        <span class="led"><span class="dot on" id="led-local"></span>local<span class="st">&nbsp;&nbsp;online</span></span>
+        <span class="led"><span class="dot idle" id="led-cloud"></span>cloud<span class="st">&nbsp;&nbsp;standby</span></span>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- nav rail -->
+      <div class="rail" role="tablist" aria-label="HERA views">
+        <div class="nav active" data-v="dash"     role="tab" tabindex="0" aria-selected="true"><span class="ic" aria-hidden="true">▤</span> dash</div>
+        <div class="nav"        data-v="chat"     role="tab" tabindex="0" aria-selected="false"><span class="ic" aria-hidden="true">❯</span> console</div>
+        <div class="nav"        data-v="settings" role="tab" tabindex="0" aria-selected="false"><span class="ic" aria-hidden="true">⚙</span> settings</div>
+        <div class="nav"        data-v="integ"    role="tab" tabindex="0" aria-selected="false"><span class="ic" aria-hidden="true">⬡</span> integrations</div>
+        <div class="spacer"></div>
+        <div class="foot">v0.1.0</div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="view active" data-view="dash" role="tabpanel">
+        <div class="pad">
+          <div class="h">status</div>
+          <div class="hsub">HERA unit overview</div>
+          <div class="card"><h3>system</h3>
+            <div class="grid">
+              <div class="stat"><div class="k">unit</div><div class="v">online</div></div>
+              <div class="stat"><div class="k">active route</div><div class="v">local</div></div>
+              <div class="stat"><div class="k">model</div><div class="v" style="font-size:13px">qwen2.5:14b</div></div>
+              <div class="stat"><div class="k">host</div><div class="v" style="font-size:13px">pi-5</div></div>
+            </div>
+          </div>
+          <div class="card"><h3>providers</h3>
+            <div class="provider"><span class="dot on"></span>
+              <div class="pn"><div class="nm">Local (Ollama)</div><div class="md">qwen2.5:14b · configured in settings</div></div>
+              <span class="pill up">up</span></div>
+            <div class="provider"><span class="dot idle"></span>
+              <div class="pn"><div class="nm">Cloud (fallback)</div><div class="md">not configured</div></div>
+              <span class="pill">off</span></div>
+          </div>
+          <div class="card"><h3>coming next episode</h3>
+            <div style="color:var(--text-dim);font-size:12px;line-height:1.8">
+              › homelab overview (VMs, containers, disk)<br>
+              › live device status<br>
+              › safe actions with approval
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHAT / CONSOLE -->
+      <div class="view" data-view="chat" role="tabpanel">
+        <div class="screen" id="screen">
+          <div class="boot">
+            <span class="hera">HERA</span> v0.1.0 · unit online<br>
+            [<span class="ok">ok</span>] backend brain ....... reachable<br>
+            [<span class="ok">ok</span>] local provider ...... ollama · qwen2.5:14b<br>
+            [<span class="ok">ok</span>] cloud fallback ...... armed<br>
+            awaiting operator.
+          </div>
+        </div>
+        <div class="bar">
+          <div class="prompt"><span class="sigil" aria-hidden="true">❯</span>
+            <input id="cmd" placeholder="message HERA" autocomplete="off"
+                   autocapitalize="sentences" autocorrect="off" spellcheck="false"
+                   enterkeyhint="send" aria-label="message HERA"/>
+            <button class="send" type="button" id="sendBtn">transmit</button></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="view" data-view="settings" role="tabpanel">
+        <div class="pad">
+          <div class="h">settings</div>
+          <div class="hsub">configure HERA - no file editing required</div>
+
+          <div class="card"><h3>ai providers</h3>
+            <div id="providerList"></div>
+            <div class="row" style="margin-top:14px">
+              <div class="field"><label for="np-name">name</label><input id="np-name" placeholder="Local (Ollama)"/></div>
+              <div class="field"><label for="np-model">model</label><input id="np-model" placeholder="qwen2.5:14b"/></div>
+            </div>
+            <div class="field"><label for="np-url">base url (openai-compatible)</label>
+              <input id="np-url" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
+                     spellcheck="false" placeholder="http://192.168.1.100:11434/v1"/></div>
+            <div class="field"><label for="np-key">api key</label>
+              <input id="np-key" type="password" autocapitalize="off" autocorrect="off"
+                     spellcheck="false" placeholder="ollama (or your cloud key)"/></div>
+            <div class="actions">
+              <button class="btn" type="button" id="btnTest">test</button>
+              <button class="btn p" type="button" id="btnAdd">add provider</button>
+              <span id="testResult" style="align-self:center;font-size:11px;color:var(--text-dim)"></span>
+            </div>
+          </div>
+
+          <div class="card"><h3>appearance</h3>
+            <div class="row">
+              <div class="field"><label for="ap-name">name</label><input id="ap-name" value="HERA"/></div>
+              <div class="field"><label for="ap-accent">accent color</label>
+                <input id="ap-accent" value="#ffb347" autocapitalize="off" autocorrect="off" spellcheck="false"/></div>
+            </div>
+            <div class="actions"><button class="btn p" type="button" id="btnAppearance">apply</button></div>
+          </div>
+
+          <div class="card"><h3>behavior</h3>
+            <div class="field"><label for="bp-prompt">system prompt</label>
+              <input id="bp-prompt" value="You are HERA, a helpful homelab assistant..."/></div>
+            <div class="actions"><button class="btn p" type="button" id="btnSave">save settings</button>
+              <span id="saveResult" style="align-self:center;font-size:11px;color:var(--text-dim)"></span></div>
+          </div>
+
+          <div class="card"><h3>connection</h3>
+            <div class="field"><label for="ap-api">backend url</label>
+              <input id="ap-api" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
+                     spellcheck="false" placeholder="http://192.168.1.100:8787"/></div>
+            <div class="actions"><button class="btn" type="button" id="btnApi">use this backend</button>
+              <span id="apiResult" style="align-self:center;font-size:11px;color:var(--text-dim)"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INTEGRATIONS -->
+      <div class="view" data-view="integ" role="tabpanel">
+        <div class="pad">
+          <div class="h">integrations</div>
+          <div class="hsub">connect HERA to your homelab - unlocking across the series</div>
+          <div class="card">
+            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">⇄</span>
+              <div class="pn"><div class="nm">Webhooks</div><div class="md">let other services trigger HERA</div></div>
+              <span class="soon">episode 5</span></div>
+            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">▣</span>
+              <div class="pn"><div class="nm">Proxmox</div><div class="md">see &amp; manage VMs</div></div>
+              <span class="soon">episode 4</span></div>
+            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">⬢</span>
+              <div class="pn"><div class="nm">Docker</div><div class="md">containers across hosts</div></div>
+              <span class="soon">episode 3</span></div>
+            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">▤</span>
+              <div class="pn"><div class="nm">Dashboard sync</div><div class="md">push changes to your dashboard</div></div>
+              <span class="soon">episode 5</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---- backend location ----
+  // Order: ?api=... (also remembered) -> saved -> same host on :8787.
+  // Using location.hostname means opening the page from a phone on the LAN
+  // talks to the same box, not to the phone's own localhost.
+  const API = (() => {
+    const strip = u => u.trim().replace(/\/+$/, '');
+    const q = new URLSearchParams(location.search).get('api');
+    if (q) { try { localStorage.setItem('hera.api', strip(q)); } catch (e) {} return strip(q); }
+    let saved = null;
+    try { saved = localStorage.getItem('hera.api'); } catch (e) {}
+    if (saved) return strip(saved);
+    if (location.protocol === 'file:' || !location.hostname) return 'http://localhost:8787';
+    return `${location.protocol}//${location.hostname}:8787`;
+  })();
+
+  const $ = id => document.getElementById(id);
+  const val = id => $(id).value.trim();
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // ---- view switching ----
+  function show(name){
+    document.querySelectorAll('.nav').forEach(x => {
+      const on = x.dataset.v === name;
+      x.classList.toggle('active', on);
+      x.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.view').forEach(x =>
+      x.classList.toggle('active', x.dataset.view === name));
+    if (name === 'chat') screen.scrollTop = screen.scrollHeight;
+  }
+  document.querySelectorAll('.nav').forEach(n => {
+    n.addEventListener('click', () => show(n.dataset.v));
+    n.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(n.dataset.v); }
+    });
+  });
+
+  // ---- chat ----
+  const screen = $('screen'), cmd = $('cmd');
+  let history = [];
+  const stamp = () => new Date().toTimeString().slice(0, 8);
+
+  function line(cls, who, txt, caret){
+    const ts = stamp();
+    screen.insertAdjacentHTML('beforeend',
+      `<div class="entry ${cls}"><div class="gutter">${cls === 'op' ? '' : ts}</div>
+       <div class="body"><div class="who ${cls === 'op' ? 'op' : 'hera'}">${esc(who)}<span class="ts">${ts}</span></div>
+       <div class="msg">${esc(txt)}${caret ? '<span class="caret"></span>' : ''}</div></div></div>`);
+    screen.scrollTop = screen.scrollHeight;
+  }
+
+  let sending = false;
+  async function send(){
+    const v = cmd.value.trim();
+    if (!v || sending) return;
+    sending = true;
+    line('op', 'operator', v);
+    cmd.value = '';
+    history.push({ role: 'user', content: v });
+    try {
+      const r = await fetch(`${API}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history })
+      });
+      const d = await r.json();
+      if (d.error) { line('hera', 'hera', '⚠ ' + d.error); return; }
+      line('hera', 'hera', d.content, true);
+      history.push({ role: 'assistant', content: d.content });
+    } catch (e) {
+      line('hera', 'hera', `⚠ backend unreachable — tried ${API}. Set the right address in Settings → Connection.`);
+    } finally {
+      sending = false;
+    }
+  }
+  $('sendBtn').addEventListener('click', send);
+  cmd.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  // keyboard opening/closing resizes the unit — keep the latest message in view
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (document.activeElement === cmd) screen.scrollTop = screen.scrollHeight;
+    }, { passive: true });
+  }
+
+  // ---- settings ----
+  let settings = null;
+  async function loadSettings(){
+    try {
+      settings = await (await fetch(`${API}/settings`)).json();
+      renderProviders();
+      fillAppearance();
+    } catch (e) { /* backend not up yet in preview */ }
+  }
+  function renderProviders(){
+    const el = $('providerList');
+    if (!settings || !Array.isArray(settings.providers)) return;
+    el.innerHTML = settings.providers.map(p => `
+      <div class="provider"><span class="dot ${p.enabled ? 'on' : 'idle'}"></span>
+        <div class="pn"><div class="nm">${esc(p.name)}</div><div class="md">${esc(p.model)} · ${esc(p.baseUrl)}</div></div>
+        <span class="pill ${p.enabled ? 'up' : ''}">${p.enabled ? 'on' : 'off'}</span></div>`).join('');
+  }
+  function fillAppearance(){
+    if (!settings) return;
+    if (settings.appearance) {
+      $('ap-name').value = settings.appearance.name ?? 'HERA';
+      $('ap-accent').value = settings.appearance.accent ?? '#ffb347';
+      applyAppearance();
+    }
+    $('bp-prompt').value = settings.systemPrompt ?? '';
+  }
+  async function testNew(){
+    const p = { name: val('np-name'), model: val('np-model'), baseUrl: val('np-url'), apiKey: val('np-key') || 'ollama' };
+    const res = $('testResult');
+    res.textContent = 'testing…'; res.style.color = 'var(--text-dim)';
+    try {
+      const r = await (await fetch(`${API}/providers/test`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p)
+      })).json();
+      res.textContent = (r.ok ? '✓ ' : '✗ ') + (r.detail ?? '');
+      res.style.color = r.ok ? 'var(--live)' : 'var(--down)';
+    } catch (e) {
+      res.textContent = '✗ backend unreachable';
+      res.style.color = 'var(--down)';
+    }
+  }
+  async function addProvider(){
+    if (!settings) settings = { providers: [], appearance: { name: 'HERA', accent: '#ffb347' }, systemPrompt: '', requestTimeoutMs: 60000 };
+    settings.providers.push({
+      id: 'p' + Date.now(), name: val('np-name'), model: val('np-model'),
+      baseUrl: val('np-url'), apiKey: val('np-key') || 'ollama',
+      enabled: true, priority: settings.providers.length + 1
+    });
+    await saveAll();
+    renderProviders();
+  }
+  function applyAppearance(){
+    document.documentElement.style.setProperty('--phosphor', val('ap-accent'));
+    $('brand').textContent = val('ap-name');
+    document.title = val('ap-name') || 'HERA';
+  }
+  async function saveAll(){
+    if (!settings) return;
+    settings.appearance = { name: val('ap-name'), accent: val('ap-accent') };
+    settings.systemPrompt = val('bp-prompt');
+    const res = $('saveResult');
+    try {
+      const r = await fetch(`${API}/settings`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings)
+      });
+      res.textContent = r.ok ? '✓ saved' : '✗ save failed';
+      res.style.color = r.ok ? 'var(--live)' : 'var(--down)';
+    } catch (e) {
+      res.textContent = '✗ backend unreachable';
+      res.style.color = 'var(--down)';
+    }
+  }
+
+  $('btnTest').addEventListener('click', testNew);
+  $('btnAdd').addEventListener('click', addProvider);
+  $('btnAppearance').addEventListener('click', applyAppearance);
+  $('btnSave').addEventListener('click', saveAll);
+
+  // ---- backend url override (needed when the phone can't guess the right host) ----
+  $('ap-api').value = API;
+  $('btnApi').addEventListener('click', () => {
+    const u = val('ap-api').replace(/\/+$/, '');
+    const res = $('apiResult');
+    if (!/^https?:\/\//.test(u)) {
+      res.textContent = '✗ must start with http:// or https://';
+      res.style.color = 'var(--down)';
+      return;
+    }
+    try { localStorage.setItem('hera.api', u); } catch (e) {}
+    res.textContent = '✓ saved — reloading';
+    res.style.color = 'var(--live)';
+    setTimeout(() => location.reload(), 600);
+  });
+
+  loadSettings();
+</script>
+</body>
+</html>
