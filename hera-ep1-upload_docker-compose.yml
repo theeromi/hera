@@ -1,0 +1,28 @@
+services:
+  hera-backend:
+    build: ./backend
+    container_name: hera-backend
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - hera-data:/app/data
+    environment:
+      - PORT=8787
+      # optional seed values (UI overrides these once saved):
+      - LOCAL_AI_BASE_URL=http://192.168.1.100:11434/v1
+      - LOCAL_AI_MODEL=qwen2.5:14b
+
+  hera-web:
+    image: nginx:alpine
+    container_name: hera-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - hera-backend
+
+volumes:
+  hera-data:
