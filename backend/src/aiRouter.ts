@@ -1,10 +1,13 @@
 import { activeProviders, loadSettings, type Provider } from "./settingsStore.js";
+import { homelabContext } from "./connectors/hostRegistry.js";
 
 /**
  * The AI Router — HERA's brain-stem.
- * Reads providers from the settings store (configured via the UI), tries them
- * in priority order, falls back on failure, and reports health so the UI LEDs
- * reflect reality. Local-first, cloud-fallback, auto-reconnect.
+ * Reads providers from the settings store, tries them in priority order,
+ * falls back on failure, and reports health so the UI LEDs reflect reality.
+ *
+ * EPISODE 2: before answering, HERA injects the live homelab state as context,
+ * so the AI answers from real data instead of guessing.
  */
 
 export interface ChatMessage {
@@ -18,7 +21,6 @@ export interface ChatResult {
   model: string;
 }
 
-/** name -> last known health, for the UI status LEDs */
 const health: Record<string, "up" | "down" | "unknown"> = {};
 
 async function callProvider(
@@ -58,8 +60,17 @@ export async function routeChat(userMessages: ChatMessage[]): Promise<ChatResult
   const providers = await activeProviders();
   if (providers.length === 0) throw new Error("No enabled AI providers. Add one in Settings.");
 
+  // EPISODE 2: give the AI eyes — inject live homelab state as context.
+  let context = "";
+  try {
+    context = await homelabContext();
+  } catch {
+    context = "Homelab state unavailable right now.";
+  }
+
   const messages: ChatMessage[] = [
     { role: "system", content: settings.systemPrompt },
+    { role: "system", content: context },
     ...userMessages,
   ];
 

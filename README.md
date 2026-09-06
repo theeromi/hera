@@ -1,4 +1,4 @@
-# HERA — Homelab Environment & Resource Assistant
+# HERA — Homelab Environment & Resource Assistant v1
 
 > A self-hosted AI assistant for your homelab. Runs on your hardware, talks to
 > your local Ollama (with an optional cloud fallback), and configures itself

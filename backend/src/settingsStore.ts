@@ -12,7 +12,7 @@ import path from "node:path";
 export interface Provider {
   id: string;
   name: string;          // friendly label, e.g. "Local 3090" or "OpenAI"
-  baseUrl: string;       // OpenAI-compatible, e.g. http://192.168.1.100:11434/v1
+  baseUrl: string;       // OpenAI-compatible, e.g. http://192.168.1.187:11434/v1
   apiKey: string;        // Ollama ignores it; cloud needs it
   model: string;         // e.g. qwen2.5:14b or gpt-4o-mini
   enabled: boolean;      // toggle without deleting
@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS: Settings = {
     {
       id: "local-default",
       name: "Local (Ollama)",
-      baseUrl: process.env.LOCAL_AI_BASE_URL || "http://192.168.1.100:11434/v1",
+      baseUrl: process.env.LOCAL_AI_BASE_URL || "http://192.168.1.187:11434/v1",
       apiKey: "ollama",
       model: process.env.LOCAL_AI_MODEL || "qwen2.5:14b",
       enabled: true,

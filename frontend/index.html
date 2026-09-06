@@ -1,595 +1,594 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a0e12">
-<meta name="color-scheme" content="dark">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>HERA</title>
-<script>
-  /* Set the real viewport height BEFORE first paint so the layout is never
-     taller than the visible screen (mobile URL bars lie about 100vh).
-     CSS falls back to 100dvh -> 100vh if this never runs. */
-  (function(){
-    var d=document.documentElement;
-    function h(){
-      var vv=window.visualViewport;
-      d.style.setProperty('--app-h',(vv?vv.height:window.innerHeight)+'px');
-      /* soft keyboard is up if the visual viewport shrank a lot */
-      if(vv) d.classList.toggle('kb-open', window.innerHeight-vv.height > 150);
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>HERA Homelab Assistant</title>
+  <style>
+    :root {
+      --bg: #070a0e;
+      --panel: #10161d;
+      --panel-2: #141c24;
+      --rack: #0b1016;
+      --edge: #27313c;
+      --edge-lit: #465461;
+      --text: #d8dde2;
+      --text-dim: #7e8994;
+      --phosphor: #ffb347;
+      --phosphor-lo: #9e682c;
+      --user-ink: #8fb8d8;
+      --live: #66d17a;
+      --warn: #f2c14e;
+      --down: #e56b6f;
+      --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
-    h();
-    window.addEventListener('resize',h,{passive:true});
-    window.addEventListener('orientationchange',h,{passive:true});
-    if(window.visualViewport){
-      window.visualViewport.addEventListener('resize',h,{passive:true});
-      window.visualViewport.addEventListener('scroll',h,{passive:true});
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--bg); }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+      padding: clamp(0px, 2vw, 24px);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% -20%, #18222d 0, transparent 45%),
+        linear-gradient(145deg, #080b0f, #05070a);
+      font: 14px/1.5 var(--mono);
     }
-  })();
-</script>
-<style>
-  /* ===== HERA - rack console ===== */
-  :root{
-    --rack:#0a0e12; --panel:#11161c; --panel-2:#161d25;
-    --edge:#232d38; --edge-lit:#2f3d4a;
-    --text:#c7d2dc; --text-dim:#6b7a89;
-    --phosphor:#ffb347; --phosphor-lo:#7a5320;
-    --live:#4ade80; --warn:#fbbf24; --down:#f87171; --user-ink:#8fb8d8;
-    --mono:"JetBrains Mono","SF Mono","Fira Code",ui-monospace,Consolas,monospace;
-    --safe-b:env(safe-area-inset-bottom,0px);
-    --safe-t:env(safe-area-inset-top,0px);
-    --safe-l:env(safe-area-inset-left,0px);
-    --safe-r:env(safe-area-inset-right,0px);
-  }
-  *{margin:0;padding:0;box-sizing:border-box}
-  html{height:100%}
-  body{
-    background:radial-gradient(1200px 600px at 50% -10%,#12191f,var(--rack) 60%),var(--rack);
-    color:var(--text);font-family:var(--mono);font-size:14px;
-    display:flex;justify-content:center;align-items:stretch;padding:18px;overflow:hidden;
-    -webkit-font-smoothing:antialiased;
-    -webkit-tap-highlight-color:transparent;
-    overscroll-behavior:none;                 /* kill pull-to-refresh / rubber-band */
-    /* progressive cascade: last one the browser understands wins */
-    height:100vh;
-    height:100dvh;
-    height:var(--app-h,100dvh);
-  }
-  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
-    background:repeating-linear-gradient(to bottom,rgba(255,255,255,.015) 0 1px,transparent 1px 3px);
-    mix-blend-mode:overlay}
+    button, input, select { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
 
-  .unit{width:100%;max-width:1180px;height:100%;min-height:0;
-    background:linear-gradient(180deg,var(--panel),#0d1319);
-    border:1px solid var(--edge);border-radius:10px;
-    box-shadow:0 0 0 1px #05080b,0 20px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.03);
-    display:flex;flex-direction:column;overflow:hidden;position:relative}
-  .screw{position:absolute;width:9px;height:9px;border-radius:50%;
-    background:radial-gradient(circle at 35% 35%,#3a4652,#161c22 70%);
-    box-shadow:inset 0 0 0 1px #05090c;top:12px}
-  .screw.l{left:12px}.screw.r{right:12px}
+    .unit {
+      position: relative;
+      width: min(1180px, 100%);
+      height: min(800px, calc(100dvh - clamp(0px, 4vw, 48px)));
+      min-height: 560px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--edge-lit);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: 0 28px 90px rgb(0 0 0 / 55%), inset 0 1px rgb(255 255 255 / 3%);
+    }
+    .screw {
+      position: absolute;
+      z-index: 5;
+      top: 8px;
+      width: 6px;
+      height: 6px;
+      border: 1px solid #4d5964;
+      border-radius: 50%;
+      background: #111820;
+    }
+    .screw.l { left: 8px; }
+    .screw.r { right: 8px; }
 
-  /* faceplate */
-  .face{flex:0 0 auto;display:flex;align-items:center;gap:16px;padding:14px 46px;
-    background:linear-gradient(180deg,var(--panel-2),var(--panel));border-bottom:1px solid var(--edge)}
-  .mark{display:flex;align-items:baseline;gap:10px;min-width:0}
-  .mark .logo{font-weight:800;letter-spacing:4px;font-size:22px;color:var(--phosphor);
-    text-shadow:0 0 14px rgba(255,179,71,.45);white-space:nowrap}
-  .mark .sub{font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase}
-  .rule{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--edge-lit),transparent)}
-  .leds{display:flex;gap:18px;align-items:center;flex-shrink:0}
-  .led{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:1px;
-    color:var(--text-dim);text-transform:uppercase;white-space:nowrap}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--down);flex:0 0 auto;
-    box-shadow:0 0 6px currentColor;color:var(--down)}
-  .dot.on{background:var(--live);color:var(--live);animation:pulse 2.4s infinite}
-  .dot.idle{background:var(--phosphor-lo);color:var(--phosphor-lo);box-shadow:none}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+    /* Faceplate */
+    .face {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+      padding: 14px 46px;
+      border-bottom: 1px solid var(--edge);
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    }
+    .mark { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+    .mark .logo {
+      flex: 0 0 auto;
+      color: var(--phosphor);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-shadow: 0 0 14px rgb(255 179 71 / 45%);
+    }
+    .mark .sub {
+      color: var(--text-dim);
+      font-size: 10px;
+      line-height: 1.35;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .rule { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--edge-lit), transparent); }
+    .leds { display: flex; align-items: center; gap: 18px; }
+    .led {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--text-dim);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .dot {
+      flex: 0 0 auto;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      color: var(--down);
+      background: var(--down);
+      box-shadow: 0 0 6px currentColor;
+    }
+    .dot.on { color: var(--live); background: var(--live); animation: pulse 2.4s infinite; }
+    .dot.idle { color: var(--phosphor-lo); background: var(--phosphor-lo); box-shadow: none; }
+    @keyframes pulse { 50% { opacity: .45; } }
 
-  /* body: nav rail + view */
-  .main{flex:1 1 auto;display:flex;min-height:0;min-width:0}
-  .rail{flex:0 0 160px;border-right:1px solid var(--edge);
-    background:linear-gradient(180deg,var(--panel),#0c1116);padding:16px 0;
-    display:flex;flex-direction:column;gap:2px}
-  .nav{display:flex;align-items:center;gap:10px;padding:11px 20px;color:var(--text-dim);
-    font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;
-    border-left:2px solid transparent;transition:color .12s,background .12s,border-color .12s;
-    touch-action:manipulation;-webkit-user-select:none;user-select:none}
-  .nav:hover{color:var(--text);background:rgba(255,255,255,.02)}
-  .nav:focus-visible{outline:1px solid var(--phosphor-lo);outline-offset:-2px}
-  .nav.active{color:var(--phosphor);border-left-color:var(--phosphor);
-    background:linear-gradient(90deg,rgba(255,179,71,.06),transparent)}
-  .nav .ic{width:14px;text-align:center;flex:0 0 auto}
-  .rail .spacer{flex:1}
-  .rail .foot{padding:12px 20px;font-size:9px;color:var(--text-dim);letter-spacing:1px}
+    /* Main frame */
+    .main { flex: 1; min-height: 0; display: flex; }
+    .rail {
+      flex: 0 0 176px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 16px 0;
+      border-right: 1px solid var(--edge);
+      background: linear-gradient(180deg, var(--panel), #0c1116);
+    }
+    .nav {
+      width: 100%;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 20px;
+      border: 0;
+      border-left: 2px solid transparent;
+      color: var(--text-dim);
+      background: transparent;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-align: left;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color .12s, background .12s, border-color .12s;
+    }
+    .nav:hover { color: var(--text); background: rgb(255 255 255 / 2%); }
+    .nav:focus-visible { outline: 2px solid var(--phosphor); outline-offset: -3px; }
+    .nav.active {
+      color: var(--phosphor);
+      border-left-color: var(--phosphor);
+      background: linear-gradient(90deg, rgb(255 179 71 / 6%), transparent);
+    }
+    .nav .ic { width: 14px; text-align: center; }
+    .rail .spacer { flex: 1; }
+    .rail .foot { padding: 12px 20px; color: var(--text-dim); font-size: 9px; letter-spacing: 1px; }
+    .view { flex: 1; min-width: 0; min-height: 0; display: none; flex-direction: column; }
+    .view.active { display: flex; }
 
-  .view{flex:1 1 auto;min-width:0;min-height:0;display:none;flex-direction:column}
-  .view.active{display:flex}
+    /* Chat */
+    .screen {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding: 22px 40px;
+      background: radial-gradient(900px 400px at 50% 0%, rgb(255 179 71 / 3%), transparent 70%);
+      scrollbar-width: thin;
+      scrollbar-color: var(--edge) transparent;
+    }
+    .screen::-webkit-scrollbar { width: 8px; }
+    .screen::-webkit-scrollbar-thumb { border-radius: 4px; background: var(--edge); }
+    .boot {
+      margin-bottom: 20px;
+      padding-left: 12px;
+      border-left: 2px solid var(--phosphor-lo);
+      color: var(--text-dim);
+      font-size: 11px;
+      line-height: 1.9;
+    }
+    .boot .ok { color: var(--live); }
+    .boot .hera { color: var(--phosphor); }
+    .entry { display: flex; gap: 14px; margin: 0 0 18px; }
+    .entry .body { min-width: 0; }
+    .gutter { flex: 0 0 66px; padding-top: 3px; color: var(--text-dim); font-size: 10px; text-align: right; }
+    .who { margin-bottom: 5px; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+    .who.hera { color: var(--phosphor); }
+    .who.op { color: var(--user-ink); }
+    .msg { overflow-wrap: anywhere; line-height: 1.65; white-space: pre-wrap; }
+    .entry.op {
+      margin-left: 52px;
+      padding: 8px 0 8px 12px;
+      border-left: 2px solid #35485c;
+      border-radius: 2px;
+      background: linear-gradient(90deg, rgb(143 184 216 / 5%), transparent);
+    }
+    .entry.op .gutter { flex-basis: 14px; }
+    .caret {
+      display: inline-block;
+      width: 8px;
+      height: 15px;
+      margin-left: 2px;
+      vertical-align: -2px;
+      background: var(--phosphor);
+      box-shadow: 0 0 8px var(--phosphor);
+      animation: blink 1.1s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    .bar {
+      flex: 0 0 auto;
+      padding: 14px 40px 16px;
+      border-top: 1px solid var(--edge);
+      background: linear-gradient(180deg, var(--panel), #0c1116);
+    }
+    .prompt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border: 1px solid var(--edge);
+      border-radius: 6px;
+      background: var(--rack);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .prompt:focus-within { border-color: var(--phosphor-lo); box-shadow: 0 0 0 1px var(--phosphor-lo), 0 0 18px rgb(255 179 71 / 8%); }
+    .sigil { color: var(--phosphor); font-weight: 700; text-shadow: 0 0 8px rgb(255 179 71 / 50%); }
+    .prompt input { flex: 1; min-width: 0; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 14px; }
+    .prompt input::placeholder { color: var(--text-dim); }
+    .send, .btn {
+      min-height: 36px;
+      padding: 8px 14px;
+      border: 1px solid var(--edge-lit);
+      border-radius: 5px;
+      color: var(--text);
+      background: transparent;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .send { min-height: 32px; padding: 6px 12px; color: var(--text-dim); }
+    .send:hover, .btn:hover, .send:focus-visible, .btn:focus-visible { color: var(--phosphor); border-color: var(--phosphor-lo); }
+    .btn.p { color: var(--phosphor); border-color: var(--phosphor-lo); }
 
-  /* ---- Chat view ---- */
-  .screen{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:22px 40px;
-    background:radial-gradient(900px 400px at 50% 0%,rgba(255,179,71,.03),transparent 70%);
-    scrollbar-width:thin;scrollbar-color:var(--edge) transparent;
-    -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-  .screen::-webkit-scrollbar{width:8px}
-  .screen::-webkit-scrollbar-thumb{background:var(--edge);border-radius:4px}
-  .boot{color:var(--text-dim);font-size:11px;line-height:1.9;margin-bottom:20px;
-    border-left:2px solid var(--phosphor-lo);padding-left:12px;overflow-wrap:anywhere}
-  .boot .ok{color:var(--live)}.boot .hera{color:var(--phosphor)}
-  .entry{margin:0 0 18px;display:flex;gap:14px}
-  .entry .body{flex:1 1 auto;min-width:0}   /* min-width:0 = long words wrap instead of blowing out the row */
-  .gutter{flex:0 0 66px;text-align:right;color:var(--text-dim);font-size:10px;padding-top:3px}
-  .who{font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
-  .who.hera{color:var(--phosphor)}.who.op{color:var(--user-ink)}
-  .who .ts{display:none;color:var(--text-dim);letter-spacing:1px;margin-left:8px}
-  .msg{line-height:1.65;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
-  .entry.op{background:linear-gradient(90deg,rgba(143,184,216,.05),transparent);
-    border-left:2px solid #35485c;padding:8px 0 8px 12px;margin-left:52px;border-radius:2px}
-  .entry.op .gutter{flex-basis:14px}
-  .caret{display:inline-block;width:8px;height:15px;background:var(--phosphor);
-    vertical-align:-2px;margin-left:2px;animation:blink 1.1s steps(1) infinite;box-shadow:0 0 8px var(--phosphor)}
-  @keyframes blink{50%{opacity:0}}
-  .bar{flex:0 0 auto;border-top:1px solid var(--edge);
-    background:linear-gradient(180deg,var(--panel),#0c1116);padding:14px 40px 16px}
-  .prompt{display:flex;align-items:center;gap:12px;background:var(--rack);
-    border:1px solid var(--edge);border-radius:6px;padding:11px 14px;transition:.15s}
-  .prompt:focus-within{border-color:var(--phosphor-lo);box-shadow:0 0 0 1px var(--phosphor-lo),0 0 18px rgba(255,179,71,.08)}
-  .sigil{color:var(--phosphor);font-weight:700;text-shadow:0 0 8px rgba(255,179,71,.5);flex:0 0 auto}
-  .prompt input{flex:1 1 auto;min-width:0;background:transparent;border:none;outline:none;
-    color:var(--text);font-family:var(--mono);font-size:14px}
-  .prompt input::placeholder{color:var(--text-dim)}
-  .send{background:transparent;border:1px solid var(--edge-lit);color:var(--text-dim);
-    font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
-    padding:6px 12px;border-radius:4px;cursor:pointer;transition:.15s;flex:0 0 auto;
-    touch-action:manipulation}
-  .send:hover{color:var(--phosphor);border-color:var(--phosphor-lo)}
+    /* Panels */
+    .pad { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 28px 40px; }
+    .h { margin-bottom: 4px; color: var(--phosphor); font-size: 13px; letter-spacing: 3px; text-transform: uppercase; }
+    .hsub { margin-bottom: 22px; color: var(--text-dim); font-size: 11px; overflow-wrap: anywhere; }
+    .card { margin-bottom: 16px; padding: 18px 20px; border: 1px solid var(--edge); border-radius: 8px; background: var(--panel-2); }
+    .card h3 { margin: 0 0 14px; color: var(--text); font-size: 11px; font-weight: 600; line-height: 1.5; letter-spacing: 2px; text-transform: uppercase; overflow-wrap: anywhere; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 14px; }
+    .stat { min-width: 0; padding: 14px; border: 1px solid var(--edge); border-radius: 6px; background: var(--rack); }
+    .stat .k { margin-bottom: 6px; color: var(--text-dim); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
+    .stat .v { color: var(--phosphor); font-size: 18px; overflow-wrap: anywhere; }
+    .field { flex: 1; min-width: 0; margin-bottom: 12px; }
+    .field label { display: block; margin-bottom: 5px; color: var(--text-dim); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+    .field input, .field select {
+      width: 100%;
+      min-width: 0;
+      padding: 9px 11px;
+      border: 1px solid var(--edge);
+      border-radius: 5px;
+      outline: 0;
+      color: var(--text);
+      background: var(--rack);
+      font-size: 13px;
+    }
+    .field input:focus, .field select:focus { border-color: var(--phosphor-lo); }
+    .row, .actions { display: flex; gap: 10px; }
+    .actions { flex-wrap: wrap; align-items: center; margin-top: 6px; }
+    .provider { display: flex; align-items: center; gap: 12px; min-width: 0; margin-bottom: 10px; padding: 12px 14px; border: 1px solid var(--edge); border-radius: 6px; background: var(--rack); }
+    .provider .pn { flex: 1; min-width: 0; }
+    .provider .nm { color: var(--text); font-size: 13px; overflow-wrap: anywhere; }
+    .provider .md { margin-top: 2px; color: var(--text-dim); font-size: 10px; overflow-wrap: anywhere; }
+    .pill { flex: 0 0 auto; padding: 3px 8px; border: 1px solid var(--edge-lit); border-radius: 10px; color: var(--text-dim); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
+    .pill.up { color: var(--live); border-color: var(--live); }
+    .pill.down { color: var(--down); border-color: var(--down); }
+    .integ { opacity: .55; }
+    .integ .soon { margin-left: auto; padding: 3px 8px; border: 1px dashed var(--edge-lit); border-radius: 10px; color: var(--text-dim); font-size: 9px; letter-spacing: 1px; white-space: nowrap; }
+    .panel-head { display: flex; align-items: flex-start; gap: 14px; }
+    .panel-head > :first-child { min-width: 0; }
+    .panel-head .btn { flex: 0 0 auto; }
+    .disk-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; }
+    .disk-meta span { overflow-wrap: anywhere; }
+    .next-list { color: var(--text-dim); font-size: 12px; line-height: 1.8; }
+    .test-result { color: var(--text-dim); font-size: 11px; }
 
-  /* ---- generic panel views (dashboard/settings/integrations) ---- */
-  .pad{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:28px 40px;
-    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
-    scrollbar-width:thin;scrollbar-color:var(--edge) transparent}
-  .pad::-webkit-scrollbar{width:8px}
-  .pad::-webkit-scrollbar-thumb{background:var(--edge);border-radius:4px}
-  .h{font-size:13px;letter-spacing:3px;text-transform:uppercase;color:var(--phosphor);margin-bottom:4px}
-  .hsub{font-size:11px;color:var(--text-dim);margin-bottom:22px}
-  .card{background:var(--panel-2);border:1px solid var(--edge);border-radius:8px;padding:18px 20px;margin-bottom:16px}
-  .card h3{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px;font-weight:600}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
-  .stat{background:var(--rack);border:1px solid var(--edge);border-radius:6px;padding:14px;min-width:0}
-  .stat .k{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
-  .stat .v{font-size:18px;color:var(--phosphor);overflow-wrap:anywhere}
-  .field{margin-bottom:12px;min-width:0}
-  .field label{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:5px}
-  .field input,.field select{width:100%;max-width:100%;background:var(--rack);border:1px solid var(--edge);
-    border-radius:5px;padding:9px 11px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none}
-  .field input:focus{border-color:var(--phosphor-lo)}
-  .row{display:flex;gap:10px}.row .field{flex:1 1 0;min-width:0}
-  .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
-  .btn{background:transparent;border:1px solid var(--edge-lit);color:var(--text);
-    font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
-    padding:8px 14px;border-radius:5px;cursor:pointer;transition:.15s;touch-action:manipulation}
-  .btn:hover{border-color:var(--phosphor-lo);color:var(--phosphor)}
-  .btn.p{border-color:var(--phosphor-lo);color:var(--phosphor)}
-  .provider{display:flex;align-items:center;gap:12px;background:var(--rack);
-    border:1px solid var(--edge);border-radius:6px;padding:12px 14px;margin-bottom:10px}
-  .provider .pn{flex:1 1 auto;min-width:0}
-  .provider .pn .nm{color:var(--text);font-size:13px;overflow-wrap:anywhere}
-  .provider .pn .md{color:var(--text-dim);font-size:10px;margin-top:2px;overflow-wrap:anywhere}
-  .pill{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:10px;
-    border:1px solid var(--edge-lit);color:var(--text-dim);flex:0 0 auto;white-space:nowrap}
-  .pill.up{color:var(--live);border-color:var(--live)}
-  .pill.down{color:var(--down);border-color:var(--down)}
-  .integ{display:flex;align-items:center;gap:14px;opacity:.55}
-  .integ .soon{margin-left:auto;font-size:9px;letter-spacing:1px;color:var(--text-dim);
-    border:1px dashed var(--edge-lit);padding:3px 8px;border-radius:10px;flex:0 0 auto;white-space:nowrap}
+    /* Compact laptops and tablets */
+    @media (max-width: 900px) and (min-width: 761px) {
+      .rail { flex-basis: 150px; }
+      .nav { padding-inline: 16px; }
+      .face, .screen, .bar, .pad { padding-inline: 24px; }
+      .mark .sub { display: none; }
+    }
 
-  /* ============ MOBILE ============
-     Phones + landscape phones: full-bleed unit, nav rail becomes a bottom tab
-     bar, bigger touch targets, condensed faceplate. Desktop is untouched. */
-  @media (max-width:760px), (orientation:landscape) and (max-height:520px){
-    body{padding:0}
-    .unit{max-width:none;border-radius:0;border:none;height:100%}
-    .screw{display:none}
-    body::after{display:none}   /* scanline blend layer costs a full-screen repaint per scroll frame */
+    /* Phones: full-screen panel with bottom navigation */
+    @media (max-width: 760px) {
+      body { display: block; min-height: 100dvh; padding: 0; overflow: hidden; }
+      .unit { width: 100%; height: 100dvh; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .screw { display: none; }
+      .face { flex-wrap: wrap; gap: 7px 14px; padding: max(12px, env(safe-area-inset-top)) 16px 10px; }
+      .mark .logo { font-size: 19px; letter-spacing: 3px; }
+      .mark .sub, .rule { display: none; }
+      .leds { order: 3; width: 100%; gap: 14px; overflow: hidden; }
+      .led { font-size: 9px; }
+      .main { flex-direction: column; }
+      .rail {
+        z-index: 3;
+        order: 2;
+        flex: 0 0 auto;
+        flex-direction: row;
+        justify-content: stretch;
+        gap: 0;
+        padding: 0 0 env(safe-area-inset-bottom);
+        border: 0;
+        border-top: 1px solid var(--edge);
+        background: #0c1116;
+      }
+      .rail .spacer, .rail .foot { display: none; }
+      .nav {
+        flex: 1 1 20%;
+        min-width: 0;
+        min-height: 58px;
+        flex-direction: column;
+        justify-content: center;
+        gap: 3px;
+        padding: 7px 2px 6px;
+        border: 0;
+        border-top: 2px solid transparent;
+        font-size: clamp(6.5px, 2vw, 8px);
+        letter-spacing: .2px;
+        text-align: center;
+      }
+      .nav.active { border: 0; border-top: 2px solid var(--phosphor); background: linear-gradient(180deg, rgb(255 179 71 / 8%), transparent); }
+      .nav .ic { width: auto; font-size: 16px; line-height: 1; }
+      .view { order: 1; }
+      .screen { padding: 16px 14px; }
+      .gutter { flex-basis: 44px; font-size: 9px; }
+      .entry.op { margin-left: 20px; }
+      .bar { padding: 10px 12px; }
+      .prompt input, .field input, .field select { font-size: 16px; } /* avoids iOS focus zoom */
+      .send { min-width: 72px; min-height: 38px; padding: 8px 10px; }
+      .pad { padding: 18px 14px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .row { flex-direction: column; gap: 0; }
+      .btn { min-height: 42px; padding: 10px 14px; }
+      .card { margin-bottom: 12px; padding: 14px; }
+      .provider { align-items: flex-start; padding: 11px 12px; }
+      .provider .pill { margin-left: auto; }
+      .disk-meta { font-size: 10px !important; }
+    }
 
-    /* faceplate: one compact row, notch-aware */
-    .face{gap:12px;padding:calc(10px + var(--safe-t)) calc(14px + var(--safe-r)) 10px calc(14px + var(--safe-l))}
-    .mark .logo{font-size:18px;letter-spacing:3px}
-    .mark .sub{display:none}
-    .rule{display:none}
-    .leds{margin-left:auto;gap:12px}
-    .led{font-size:9px;gap:5px}
-    .led .st{display:none}      /* just the dot + "local"/"cloud" */
+    @media (max-width: 420px) {
+      body { font-size: 13px; }
+      .face { padding-inline: 12px; }
+      .leds { flex-wrap: wrap; gap: 5px 10px; }
+      .screen { padding: 14px 10px; }
+      .gutter { display: none; }
+      .entry { gap: 0; }
+      .entry.op { margin-left: 8px; }
+      .bar { padding-inline: 8px; }
+      .prompt { gap: 8px; padding: 9px 10px; }
+      .send { min-width: 0; padding: 8px; font-size: 9px; }
+      .pad { padding: 14px 10px; }
+      .grid { grid-template-columns: 1fr; }
+      .panel-head { flex-direction: column; align-items: stretch; gap: 8px; }
+      .panel-head .btn { align-self: flex-start; }
+      .integ { flex-wrap: wrap; }
+      .integ .soon { margin-left: 20px; }
+    }
 
-    /* body: stack vertically, rail becomes a bottom tab bar */
-    .main{flex-direction:column}
-    .rail{flex:0 0 auto;flex-direction:row;order:2;border-right:none;
-      border-top:1px solid var(--edge);gap:0;justify-content:space-around;
-      padding:0 var(--safe-r) var(--safe-b) var(--safe-l)}
-    .rail .spacer,.rail .foot{display:none}
-    .nav{flex:1 1 0;flex-direction:column;gap:3px;justify-content:center;align-items:center;
-      min-height:54px;padding:8px 2px;font-size:9px;letter-spacing:.5px;border-left:none;
-      border-top:2px solid transparent;text-align:center}
-    .nav.active{border-left:none;border-top-color:var(--phosphor);
-      background:linear-gradient(180deg,rgba(255,179,71,.08),transparent)}
-    .nav .ic{font-size:16px;width:auto;line-height:1}
-    /* keyboard up = reclaim the tab bar's height for the message list */
-    .kb-open .rail{display:none}
-
-    .view{order:1;flex:1 1 auto;min-height:0}
-
-    /* chat: drop the timestamp gutter, move the stamp inline -> ~55px more text width */
-    .screen{padding:14px calc(14px + var(--safe-r)) 14px calc(14px + var(--safe-l))}
-    .gutter{display:none}
-    .who .ts{display:inline}
-    .entry{gap:0;margin-bottom:16px}
-    .entry.op{margin-left:16px}
-    .bar{padding:10px calc(12px + var(--safe-r)) 10px calc(12px + var(--safe-l))}
-    .prompt{padding:8px 10px;gap:9px}
-    .prompt input{font-size:16px}          /* >=16px stops iOS zoom-on-focus */
-    .send{padding:10px 12px;min-height:40px}
-
-    /* panels */
-    .pad{padding:18px calc(14px + var(--safe-r)) 24px calc(14px + var(--safe-l))}
-    .grid{grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
-    .card{padding:16px 14px}
-    .row{flex-direction:column;gap:0}
-    .field input,.field select{font-size:16px;padding:11px}   /* no iOS zoom + fat-finger target */
-    .btn{padding:11px 16px;min-height:42px}
-    .provider{flex-wrap:wrap;padding:12px}
-    .integ .soon{margin-left:auto}
-  }
-
-  /* very narrow phones */
-  @media (max-width:380px){
-    .mark .logo{font-size:16px;letter-spacing:2px}
-    .led{font-size:8px}
-    .grid{grid-template-columns:1fr 1fr}
-    .nav{font-size:8px}
-  }
-
-  @media (prefers-reduced-motion:reduce){
-    *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
-  }
-</style>
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+    }
+  </style>
 </head>
 <body>
   <div class="unit">
-    <span class="screw l"></span><span class="screw r"></span>
+    <span class="screw l" aria-hidden="true"></span><span class="screw r" aria-hidden="true"></span>
 
-    <div class="face">
-      <div class="mark"><span class="logo" id="brand">HERA</span>
-        <span class="sub">homelab environment<br>&amp; resource assistant</span></div>
-      <div class="rule"></div>
-      <div class="leds" id="leds">
-        <span class="led"><span class="dot on" id="led-local"></span>local<span class="st">&nbsp;&nbsp;online</span></span>
-        <span class="led"><span class="dot idle" id="led-cloud"></span>cloud<span class="st">&nbsp;&nbsp;standby</span></span>
+    <header class="face">
+      <div class="mark"><span class="logo" id="brand">HERA</span><span class="sub">homelab environment<br>&amp; resource assistant</span></div>
+      <div class="rule" aria-hidden="true"></div>
+      <div class="leds" id="leds" aria-label="Connection status">
+        <span class="led"><span class="dot on" aria-hidden="true"></span> local · online</span>
+        <span class="led"><span class="dot idle" aria-hidden="true"></span> cloud · standby</span>
       </div>
-    </div>
+    </header>
 
     <div class="main">
-      <!-- nav rail -->
-      <div class="rail" role="tablist" aria-label="HERA views">
-        <div class="nav active" data-v="dash"     role="tab" tabindex="0" aria-selected="true"><span class="ic" aria-hidden="true">▤</span> dash</div>
-        <div class="nav"        data-v="chat"     role="tab" tabindex="0" aria-selected="false"><span class="ic" aria-hidden="true">❯</span> console</div>
-        <div class="nav"        data-v="settings" role="tab" tabindex="0" aria-selected="false"><span class="ic" aria-hidden="true">⚙</span> settings</div>
-        <div class="nav"        data-v="integ"    role="tab" tabindex="0" aria-selected="false"><span class="ic" aria-hidden="true">⬡</span> integrations</div>
-        <div class="spacer"></div>
-        <div class="foot">v0.1.0</div>
-      </div>
+      <nav class="rail" aria-label="Primary navigation">
+        <button class="nav active" type="button" data-v="dash" aria-selected="true"><span class="ic" aria-hidden="true">▤</span><span>dash</span></button>
+        <button class="nav" type="button" data-v="chat" aria-selected="false"><span class="ic" aria-hidden="true">λ</span><span>console</span></button>
+        <button class="nav" type="button" data-v="settings" aria-selected="false"><span class="ic" aria-hidden="true">⚙</span><span>settings</span></button>
+        <button class="nav" type="button" data-v="homelab" aria-selected="false"><span class="ic" aria-hidden="true">◈</span><span>homelab</span></button>
+        <button class="nav" type="button" data-v="integ" aria-selected="false"><span class="ic" aria-hidden="true">⇄</span><span>integrations</span></button>
+        <div class="spacer"></div><div class="foot">v0.1.0</div>
+      </nav>
 
-      <!-- DASHBOARD -->
-      <div class="view active" data-view="dash" role="tabpanel">
+      <section class="view active" data-view="dash" aria-label="Dashboard">
         <div class="pad">
-          <div class="h">status</div>
-          <div class="hsub">HERA unit overview</div>
-          <div class="card"><h3>system</h3>
+          <div class="h">status</div><div class="hsub">HERA unit overview</div>
+          <section class="card"><h3>system</h3>
             <div class="grid">
               <div class="stat"><div class="k">unit</div><div class="v">online</div></div>
               <div class="stat"><div class="k">active route</div><div class="v">local</div></div>
               <div class="stat"><div class="k">model</div><div class="v" style="font-size:13px">qwen2.5:14b</div></div>
               <div class="stat"><div class="k">host</div><div class="v" style="font-size:13px">pi-5</div></div>
             </div>
-          </div>
-          <div class="card"><h3>providers</h3>
-            <div class="provider"><span class="dot on"></span>
-              <div class="pn"><div class="nm">Local (Ollama)</div><div class="md">qwen2.5:14b · configured in settings</div></div>
-              <span class="pill up">up</span></div>
-            <div class="provider"><span class="dot idle"></span>
-              <div class="pn"><div class="nm">Cloud (fallback)</div><div class="md">not configured</div></div>
-              <span class="pill">off</span></div>
-          </div>
-          <div class="card"><h3>coming next episode</h3>
-            <div style="color:var(--text-dim);font-size:12px;line-height:1.8">
-              › homelab overview (VMs, containers, disk)<br>
-              › live device status<br>
-              › safe actions with approval
-            </div>
-          </div>
+          </section>
+          <section class="card"><h3>providers</h3>
+            <div class="provider"><span class="dot on" aria-hidden="true"></span><div class="pn"><div class="nm">Local (Ollama)</div><div class="md">qwen2.5:14b · 192.168.1.187</div></div><span class="pill up">up</span></div>
+            <div class="provider"><span class="dot idle" aria-hidden="true"></span><div class="pn"><div class="nm">Cloud (fallback)</div><div class="md">not configured</div></div><span class="pill">off</span></div>
+          </section>
+          <section class="card"><h3>coming next episode</h3><div class="next-list">→ homelab overview (VMs, containers, disk)<br>→ live device status<br>→ safe actions with approval</div></section>
         </div>
-      </div>
+      </section>
 
-      <!-- CHAT / CONSOLE -->
-      <div class="view" data-view="chat" role="tabpanel">
-        <div class="screen" id="screen">
-          <div class="boot">
-            <span class="hera">HERA</span> v0.1.0 · unit online<br>
-            [<span class="ok">ok</span>] backend brain ....... reachable<br>
-            [<span class="ok">ok</span>] local provider ...... ollama · qwen2.5:14b<br>
-            [<span class="ok">ok</span>] cloud fallback ...... armed<br>
-            awaiting operator.
-          </div>
+      <section class="view" data-view="chat" aria-label="Console">
+        <div class="screen" id="screen" aria-live="polite">
+          <div class="boot"><span class="hera">HERA</span> v0.1.0 · unit online<br>[<span class="ok">ok</span>] backend brain ....... reachable<br>[<span class="ok">ok</span>] local provider ...... ollama · qwen2.5:14b<br>[<span class="ok">ok</span>] cloud fallback ...... armed<br>awaiting operator.</div>
         </div>
-        <div class="bar">
-          <div class="prompt"><span class="sigil" aria-hidden="true">❯</span>
-            <input id="cmd" placeholder="message HERA" autocomplete="off"
-                   autocapitalize="sentences" autocorrect="off" spellcheck="false"
-                   enterkeyhint="send" aria-label="message HERA"/>
-            <button class="send" type="button" id="sendBtn">transmit</button></div>
-        </div>
-      </div>
+        <div class="bar"><form class="prompt" id="promptForm"><span class="sigil" aria-hidden="true">λ</span><input id="cmd" aria-label="Message HERA" placeholder="message HERA…" autocomplete="off"><button class="send" type="submit">transmit</button></form></div>
+      </section>
 
-      <!-- SETTINGS -->
-      <div class="view" data-view="settings" role="tabpanel">
+      <section class="view" data-view="settings" aria-label="Settings">
         <div class="pad">
-          <div class="h">settings</div>
-          <div class="hsub">configure HERA - no file editing required</div>
-
-          <div class="card"><h3>ai providers</h3>
+          <div class="h">settings</div><div class="hsub">configure HERA — no file editing required</div>
+          <section class="card"><h3>ai providers</h3>
             <div id="providerList"></div>
-            <div class="row" style="margin-top:14px">
-              <div class="field"><label for="np-name">name</label><input id="np-name" placeholder="Local (Ollama)"/></div>
-              <div class="field"><label for="np-model">model</label><input id="np-model" placeholder="qwen2.5:14b"/></div>
-            </div>
-            <div class="field"><label for="np-url">base url (openai-compatible)</label>
-              <input id="np-url" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
-                     spellcheck="false" placeholder="http://192.168.1.100:11434/v1"/></div>
-            <div class="field"><label for="np-key">api key</label>
-              <input id="np-key" type="password" autocapitalize="off" autocorrect="off"
-                     spellcheck="false" placeholder="ollama (or your cloud key)"/></div>
-            <div class="actions">
-              <button class="btn" type="button" id="btnTest">test</button>
-              <button class="btn p" type="button" id="btnAdd">add provider</button>
-              <span id="testResult" style="align-self:center;font-size:11px;color:var(--text-dim)"></span>
-            </div>
-          </div>
-
-          <div class="card"><h3>appearance</h3>
-            <div class="row">
-              <div class="field"><label for="ap-name">name</label><input id="ap-name" value="HERA"/></div>
-              <div class="field"><label for="ap-accent">accent color</label>
-                <input id="ap-accent" value="#ffb347" autocapitalize="off" autocorrect="off" spellcheck="false"/></div>
-            </div>
-            <div class="actions"><button class="btn p" type="button" id="btnAppearance">apply</button></div>
-          </div>
-
-          <div class="card"><h3>behavior</h3>
-            <div class="field"><label for="bp-prompt">system prompt</label>
-              <input id="bp-prompt" value="You are HERA, a helpful homelab assistant..."/></div>
-            <div class="actions"><button class="btn p" type="button" id="btnSave">save settings</button>
-              <span id="saveResult" style="align-self:center;font-size:11px;color:var(--text-dim)"></span></div>
-          </div>
-
-          <div class="card"><h3>connection</h3>
-            <div class="field"><label for="ap-api">backend url</label>
-              <input id="ap-api" type="url" inputmode="url" autocapitalize="off" autocorrect="off"
-                     spellcheck="false" placeholder="http://192.168.1.100:8787"/></div>
-            <div class="actions"><button class="btn" type="button" id="btnApi">use this backend</button>
-              <span id="apiResult" style="align-self:center;font-size:11px;color:var(--text-dim)"></span></div>
-          </div>
+            <div class="row" style="margin-top:14px"><div class="field"><label for="np-name">name</label><input id="np-name" placeholder="Local (Ollama)"></div><div class="field"><label for="np-model">model</label><input id="np-model" placeholder="qwen2.5:14b"></div></div>
+            <div class="field"><label for="np-url">base url (openai-compatible)</label><input id="np-url" inputmode="url" placeholder="http://192.168.1.187:11434/v1"></div>
+            <div class="field"><label for="np-key">api key</label><input id="np-key" type="password" placeholder="ollama (or your cloud key)"></div>
+            <div class="actions"><button class="btn" type="button" onclick="testNew()">test</button><button class="btn p" type="button" onclick="addProvider()">add provider</button><span id="testResult" class="test-result"></span></div>
+          </section>
+          <section class="card"><h3>appearance</h3><div class="row"><div class="field"><label for="ap-name">name</label><input id="ap-name" value="HERA"></div><div class="field"><label for="ap-accent">accent color</label><input id="ap-accent" type="color" value="#ffb347"></div></div><button class="btn p" type="button" onclick="applyAppearance()">apply</button></section>
+          <section class="card"><h3>behavior</h3><div class="field"><label for="bp-prompt">system prompt</label><input id="bp-prompt" value="You are HERA, a helpful homelab assistant..."></div><button class="btn p" type="button" onclick="saveAll()">save settings</button></section>
         </div>
-      </div>
+      </section>
 
-      <!-- INTEGRATIONS -->
-      <div class="view" data-view="integ" role="tabpanel">
+      <section class="view" data-view="homelab" aria-label="Homelab">
+        <div class="pad"><div class="panel-head"><div style="flex:1"><div class="h">homelab</div><div class="hsub" id="hl-sub">read live over ssh · read-only</div></div><button class="btn" type="button" onclick="refreshHomelab()">refresh</button></div><div id="hl-hosts"><div class="card"><div style="color:var(--text-dim);font-size:12px">Open this tab to scan hosts.</div></div></div></div>
+      </section>
+
+      <section class="view" data-view="integ" aria-label="Integrations">
         <div class="pad">
-          <div class="h">integrations</div>
-          <div class="hsub">connect HERA to your homelab - unlocking across the series</div>
-          <div class="card">
-            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">⇄</span>
-              <div class="pn"><div class="nm">Webhooks</div><div class="md">let other services trigger HERA</div></div>
-              <span class="soon">episode 5</span></div>
-            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">▣</span>
-              <div class="pn"><div class="nm">Proxmox</div><div class="md">see &amp; manage VMs</div></div>
-              <span class="soon">episode 4</span></div>
-            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">⬢</span>
-              <div class="pn"><div class="nm">Docker</div><div class="md">containers across hosts</div></div>
-              <span class="soon">episode 3</span></div>
-            <div class="provider integ"><span class="ic" aria-hidden="true" style="color:var(--phosphor)">▤</span>
-              <div class="pn"><div class="nm">Dashboard sync</div><div class="md">push changes to your dashboard</div></div>
-              <span class="soon">episode 5</span></div>
-          </div>
+          <div class="h">integrations</div><div class="hsub">connect HERA to your homelab — unlocking across the series</div>
+          <section class="card">
+            <div class="provider integ"><span class="ic" aria-hidden="true">⇄</span><div class="pn"><div class="nm">Webhooks</div><div class="md">let other services trigger HERA</div></div><span class="soon">episode 5</span></div>
+            <div class="provider integ"><span class="ic" aria-hidden="true">▤</span><div class="pn"><div class="nm">Proxmox</div><div class="md">see &amp; manage VMs</div></div><span class="soon">episode 4</span></div>
+            <div class="provider integ"><span class="ic" aria-hidden="true">◧</span><div class="pn"><div class="nm">Docker</div><div class="md">containers across hosts</div></div><span class="soon">episode 3</span></div>
+            <div class="provider integ"><span class="ic" aria-hidden="true">▦</span><div class="pn"><div class="nm">Dashboard sync</div><div class="md">push changes to your dashboard</div></div><span class="soon">episode 5</span></div>
+          </section>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 
-<script>
-  // ---- backend location ----
-  // Order: ?api=... (also remembered) -> saved -> same host on :8787.
-  // Using location.hostname means opening the page from a phone on the LAN
-  // talks to the same box, not to the phone's own localhost.
-  const API = (() => {
-    const strip = u => u.trim().replace(/\/+$/, '');
-    const q = new URLSearchParams(location.search).get('api');
-    if (q) { try { localStorage.setItem('hera.api', strip(q)); } catch (e) {} return strip(q); }
-    let saved = null;
-    try { saved = localStorage.getItem('hera.api'); } catch (e) {}
-    if (saved) return strip(saved);
-    if (location.protocol === 'file:' || !location.hostname) return 'http://localhost:8787';
-    return `${location.protocol}//${location.hostname}:8787`;
-  })();
+  <script>
+    const API = location.protocol === 'file:'
+      ? 'http://localhost:8787'
+      : `${location.protocol}//${location.hostname}:8787`;
+    const screenEl = document.getElementById('screen');
+    const cmd = document.getElementById('cmd');
+    let history = [];
+    let settings = null;
 
-  const $ = id => document.getElementById(id);
-  const val = id => $(id).value.trim();
-  const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-  // ---- view switching ----
-  function show(name){
-    document.querySelectorAll('.nav').forEach(x => {
-      const on = x.dataset.v === name;
-      x.classList.toggle('active', on);
-      x.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    document.querySelectorAll('.view').forEach(x =>
-      x.classList.toggle('active', x.dataset.view === name));
-    if (name === 'chat') screen.scrollTop = screen.scrollHeight;
-  }
-  document.querySelectorAll('.nav').forEach(n => {
-    n.addEventListener('click', () => show(n.dataset.v));
-    n.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(n.dataset.v); }
-    });
-  });
-
-  // ---- chat ----
-  const screen = $('screen'), cmd = $('cmd');
-  let history = [];
-  const stamp = () => new Date().toTimeString().slice(0, 8);
-
-  function line(cls, who, txt, caret){
-    const ts = stamp();
-    screen.insertAdjacentHTML('beforeend',
-      `<div class="entry ${cls}"><div class="gutter">${cls === 'op' ? '' : ts}</div>
-       <div class="body"><div class="who ${cls === 'op' ? 'op' : 'hera'}">${esc(who)}<span class="ts">${ts}</span></div>
-       <div class="msg">${esc(txt)}${caret ? '<span class="caret"></span>' : ''}</div></div></div>`);
-    screen.scrollTop = screen.scrollHeight;
-  }
-
-  let sending = false;
-  async function send(){
-    const v = cmd.value.trim();
-    if (!v || sending) return;
-    sending = true;
-    line('op', 'operator', v);
-    cmd.value = '';
-    history.push({ role: 'user', content: v });
-    try {
-      const r = await fetch(`${API}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history })
+    document.querySelectorAll('.nav').forEach((nav) => {
+      nav.addEventListener('click', () => {
+        document.querySelectorAll('.nav').forEach((item) => {
+          item.classList.toggle('active', item === nav);
+          item.setAttribute('aria-selected', item === nav ? 'true' : 'false');
+        });
+        document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.dataset.view === nav.dataset.v));
+        if (nav.dataset.v === 'homelab') loadHomelab(false);
       });
-      const d = await r.json();
-      if (d.error) { line('hera', 'hera', '⚠ ' + d.error); return; }
-      line('hera', 'hera', d.content, true);
-      history.push({ role: 'assistant', content: d.content });
-    } catch (e) {
-      line('hera', 'hera', `⚠ backend unreachable — tried ${API}. Set the right address in Settings → Connection.`);
-    } finally {
-      sending = false;
-    }
-  }
-  $('sendBtn').addEventListener('click', send);
-  cmd.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-  });
-  // keyboard opening/closing resizes the unit — keep the latest message in view
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      if (document.activeElement === cmd) screen.scrollTop = screen.scrollHeight;
-    }, { passive: true });
-  }
+    });
 
-  // ---- settings ----
-  let settings = null;
-  async function loadSettings(){
-    try {
-      settings = await (await fetch(`${API}/settings`)).json();
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+    const stamp = () => new Date().toTimeString().slice(0, 8);
+    const val = (id) => document.getElementById(id).value.trim();
+
+    function line(cls, who, text, caret = false) {
+      screenEl.insertAdjacentHTML('beforeend', `<div class="entry ${cls}"><div class="gutter">${cls === 'op' ? '›' : stamp()}</div><div class="body"><div class="who ${cls === 'op' ? 'op' : 'hera'}">${escapeHtml(who)}</div><div class="msg">${escapeHtml(text)}${caret ? '<span class="caret"></span>' : ''}</div></div></div>`);
+      screenEl.scrollTop = screenEl.scrollHeight;
+    }
+
+    async function send() {
+      const message = cmd.value.trim();
+      if (!message) return;
+      line('op', 'operator', message);
+      cmd.value = '';
+      history.push({role: 'user', content: message});
+      try {
+        const response = await fetch(`${API}/chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({messages: history})});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (data.error) return line('hera', 'hera', `⚠ ${data.error}`);
+        line('hera', 'hera', data.content, true);
+        history.push({role: 'assistant', content: data.content});
+      } catch {
+        line('hera', 'hera', '⚠ backend unreachable — is HERA running on :8787?');
+      }
+    }
+    document.getElementById('promptForm').addEventListener('submit', (event) => { event.preventDefault(); send(); });
+
+    async function loadSettings() {
+      try {
+        const response = await fetch(`${API}/settings`);
+        if (!response.ok) return;
+        settings = await response.json();
+        renderProviders();
+        fillAppearance();
+      } catch { /* The standalone preview can run without a backend. */ }
+    }
+    function renderProviders() {
+      const element = document.getElementById('providerList');
+      if (!settings) return;
+      element.innerHTML = settings.providers.map((provider) => `<div class="provider"><span class="dot ${provider.enabled ? 'on' : 'idle'}"></span><div class="pn"><div class="nm">${escapeHtml(provider.name)}</div><div class="md">${escapeHtml(provider.model)} · ${escapeHtml(provider.baseUrl)}</div></div><span class="pill ${provider.enabled ? 'up' : ''}">${provider.enabled ? 'on' : 'off'}</span></div>`).join('');
+    }
+    function fillAppearance() {
+      if (!settings) return;
+      document.getElementById('ap-name').value = settings.appearance.name;
+      document.getElementById('ap-accent').value = settings.appearance.accent;
+      document.getElementById('bp-prompt').value = settings.systemPrompt;
+    }
+    async function testNew() {
+      const provider = {name: val('np-name'), model: val('np-model'), baseUrl: val('np-url'), apiKey: val('np-key') || 'ollama'};
+      const result = document.getElementById('testResult');
+      result.textContent = 'testing…';
+      try {
+        const response = await fetch(`${API}/providers/test`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(provider)});
+        const data = await response.json();
+        result.textContent = `${data.ok ? '✓' : '✗'} ${data.detail}`;
+        result.style.color = data.ok ? 'var(--live)' : 'var(--down)';
+      } catch {
+        result.textContent = '✗ backend unreachable';
+        result.style.color = 'var(--down)';
+      }
+    }
+    async function addProvider() {
+      if (!settings) settings = {providers: [], appearance: {name: 'HERA', accent: '#ffb347'}, systemPrompt: '', requestTimeoutMs: 60000};
+      settings.providers.push({id: `p${Date.now()}`, name: val('np-name'), model: val('np-model'), baseUrl: val('np-url'), apiKey: val('np-key') || 'ollama', enabled: true, priority: settings.providers.length + 1});
+      await saveAll();
       renderProviders();
-      fillAppearance();
-    } catch (e) { /* backend not up yet in preview */ }
-  }
-  function renderProviders(){
-    const el = $('providerList');
-    if (!settings || !Array.isArray(settings.providers)) return;
-    el.innerHTML = settings.providers.map(p => `
-      <div class="provider"><span class="dot ${p.enabled ? 'on' : 'idle'}"></span>
-        <div class="pn"><div class="nm">${esc(p.name)}</div><div class="md">${esc(p.model)} · ${esc(p.baseUrl)}</div></div>
-        <span class="pill ${p.enabled ? 'up' : ''}">${p.enabled ? 'on' : 'off'}</span></div>`).join('');
-  }
-  function fillAppearance(){
-    if (!settings) return;
-    if (settings.appearance) {
-      $('ap-name').value = settings.appearance.name ?? 'HERA';
-      $('ap-accent').value = settings.appearance.accent ?? '#ffb347';
-      applyAppearance();
     }
-    $('bp-prompt').value = settings.systemPrompt ?? '';
-  }
-  async function testNew(){
-    const p = { name: val('np-name'), model: val('np-model'), baseUrl: val('np-url'), apiKey: val('np-key') || 'ollama' };
-    const res = $('testResult');
-    res.textContent = 'testing…'; res.style.color = 'var(--text-dim)';
-    try {
-      const r = await (await fetch(`${API}/providers/test`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p)
-      })).json();
-      res.textContent = (r.ok ? '✓ ' : '✗ ') + (r.detail ?? '');
-      res.style.color = r.ok ? 'var(--live)' : 'var(--down)';
-    } catch (e) {
-      res.textContent = '✗ backend unreachable';
-      res.style.color = 'var(--down)';
+    function applyAppearance() {
+      document.documentElement.style.setProperty('--phosphor', val('ap-accent'));
+      document.getElementById('brand').textContent = val('ap-name') || 'HERA';
     }
-  }
-  async function addProvider(){
-    if (!settings) settings = { providers: [], appearance: { name: 'HERA', accent: '#ffb347' }, systemPrompt: '', requestTimeoutMs: 60000 };
-    settings.providers.push({
-      id: 'p' + Date.now(), name: val('np-name'), model: val('np-model'),
-      baseUrl: val('np-url'), apiKey: val('np-key') || 'ollama',
-      enabled: true, priority: settings.providers.length + 1
-    });
-    await saveAll();
-    renderProviders();
-  }
-  function applyAppearance(){
-    document.documentElement.style.setProperty('--phosphor', val('ap-accent'));
-    $('brand').textContent = val('ap-name');
-    document.title = val('ap-name') || 'HERA';
-  }
-  async function saveAll(){
-    if (!settings) return;
-    settings.appearance = { name: val('ap-name'), accent: val('ap-accent') };
-    settings.systemPrompt = val('bp-prompt');
-    const res = $('saveResult');
-    try {
-      const r = await fetch(`${API}/settings`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings)
-      });
-      res.textContent = r.ok ? '✓ saved' : '✗ save failed';
-      res.style.color = r.ok ? 'var(--live)' : 'var(--down)';
-    } catch (e) {
-      res.textContent = '✗ backend unreachable';
-      res.style.color = 'var(--down)';
+    function saveAll() {
+      if (!settings) return Promise.resolve();
+      settings.appearance = {name: val('ap-name'), accent: val('ap-accent')};
+      settings.systemPrompt = val('bp-prompt');
+      return fetch(`${API}/settings`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(settings)});
     }
-  }
 
-  $('btnTest').addEventListener('click', testNew);
-  $('btnAdd').addEventListener('click', addProvider);
-  $('btnAppearance').addEventListener('click', applyAppearance);
-  $('btnSave').addEventListener('click', saveAll);
-
-  // ---- backend url override (needed when the phone can't guess the right host) ----
-  $('ap-api').value = API;
-  $('btnApi').addEventListener('click', () => {
-    const u = val('ap-api').replace(/\/+$/, '');
-    const res = $('apiResult');
-    if (!/^https?:\/\//.test(u)) {
-      res.textContent = '✗ must start with http:// or https://';
-      res.style.color = 'var(--down)';
-      return;
+    async function loadHomelab(force) {
+      const element = document.getElementById('hl-hosts');
+      const subtitle = document.getElementById('hl-sub');
+      element.innerHTML = '<div class="card"><div style="color:var(--text-dim);font-size:12px">scanning…</div></div>';
+      try {
+        const response = await fetch(`${API}/homelab${force ? '?force=1' : ''}`);
+        const data = await response.json();
+        if (data.error) { element.innerHTML = `<div class="card"><div style="color:var(--down)">⚠ ${escapeHtml(data.error)}</div></div>`; return; }
+        subtitle.textContent = `read live over ssh · read-only · ${data.cached ? 'cached' : 'fresh'} · ${new Date(data.readAt).toLocaleTimeString()}`;
+        element.innerHTML = data.hosts.map((host) => {
+          if (!host.reachable) return `<div class="card"><h3><span class="dot" style="display:inline-block;margin-right:8px"></span>${escapeHtml(host.name)}</h3><div style="color:var(--down);font-size:12px">unreachable${host.error ? ` — ${escapeHtml(host.error)}` : ''}</div></div>`;
+          const disks = host.disks.map((disk) => {
+            const color = disk.usedPercent >= 90 ? 'var(--down)' : disk.usedPercent >= 75 ? 'var(--warn)' : 'var(--live)';
+            const percent = Math.max(0, Math.min(100, Number(disk.usedPercent) || 0));
+            return `<div style="margin-bottom:10px"><div class="disk-meta" style="font-size:11px;color:var(--text-dim);margin-bottom:4px"><span>${escapeHtml(disk.filesystem)}</span><span>${escapeHtml(disk.used)} / ${escapeHtml(disk.size)} · ${escapeHtml(disk.available)} free</span></div><div style="height:6px;background:var(--rack);border:1px solid var(--edge);border-radius:3px;overflow:hidden"><div style="height:100%;width:${percent}%;background:${color}"></div></div></div>`;
+          }).join('') || '<div style="color:var(--text-dim);font-size:11px">no drives reported</div>';
+          const containers = host.containers.length ? host.containers.map((container) => `<span class="pill up" style="margin:0 6px 6px 0;display:inline-block">${escapeHtml(container.name)}</span>`).join('') : '<span style="color:var(--text-dim);font-size:11px">no containers</span>';
+          const memory = host.memoryTotalMb && host.memoryUsedMb ? `${Math.round(host.memoryUsedMb / 1024 * 10) / 10}G / ${Math.round(host.memoryTotalMb / 1024 * 10) / 10}G` : '—';
+          return `<div class="card"><h3><span class="dot on" style="display:inline-block;margin-right:8px"></span>${escapeHtml(host.name)} <span style="color:var(--text-dim);font-weight:400;letter-spacing:0;text-transform:none">· ${escapeHtml(host.hostname || '')}</span></h3><div class="grid" style="margin-bottom:14px"><div class="stat"><div class="k">uptime</div><div class="v" style="font-size:12px">${escapeHtml(host.uptime || '—')}</div></div><div class="stat"><div class="k">load</div><div class="v" style="font-size:12px">${escapeHtml(host.loadAvg ?? '—')}</div></div><div class="stat"><div class="k">memory</div><div class="v" style="font-size:12px">${memory}</div></div><div class="stat"><div class="k">containers</div><div class="v" style="font-size:12px">${host.containers.length}</div></div></div><div class="k" style="margin-bottom:8px">storage</div>${disks}<div class="k" style="margin:14px 0 8px">docker</div><div>${containers}</div></div>`;
+        }).join('');
+      } catch {
+        element.innerHTML = '<div class="card"><div style="color:var(--down)">⚠ backend unreachable</div></div>';
+      }
     }
-    try { localStorage.setItem('hera.api', u); } catch (e) {}
-    res.textContent = '✓ saved — reloading';
-    res.style.color = 'var(--live)';
-    setTimeout(() => location.reload(), 600);
-  });
-
-  loadSettings();
-</script>
+    async function refreshHomelab() { await loadHomelab(true); }
+    loadSettings();
+  </script>
 </body>
 </html>
