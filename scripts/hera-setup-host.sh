@@ -9,7 +9,7 @@
 #
 #  Usage:
 #     ./hera-setup-host.sh                    → interactive, asks for details
-#     ./hera-setup-host.sh user@192.168.1.187 → set up one host directly
+#     ./hera-setup-host.sh user@YOUR-HOST-IP  → set up one host directly
 #     ./hera-setup-host.sh --test-all         → re-test every configured host
 #
 #  Safe to re-run. It never overwrites an existing key and only ever runs
@@ -145,8 +145,8 @@ test_all() {
 
 interactive() {
   say "add the machines you want HERA to read."
-  dim "format: user@ip        (e.g. dimandem@192.168.1.187)"
-  dim "        user@ip:port   (e.g. Dimandem@192.168.1.197:9222 for a custom SSH port)"
+  dim "format: user@ip        (e.g. user@YOUR-HOST-IP)"
+  dim "        user@ip:port   (e.g. user@YOUR-NAS-IP:9222 for a custom SSH port)"
   dim "press Enter on an empty line when you're done"
   echo
   while true; do

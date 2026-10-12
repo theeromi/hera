@@ -83,13 +83,15 @@ export async function homelabContext(): Promise<string> {
   if (hosts.length === 0) return "No homelab hosts are configured yet.";
 
   const lines = hosts.map((h) => {
-    if (!h.reachable) return `- ${h.name}: UNREACHABLE${h.error ? ` (${h.error})` : ""}`;
+    if (!h.reachable) return `- ${h.name} (id: ${h.id}): UNREACHABLE${h.error ? ` (${h.error})` : ""}`;
 
     const disks = h.disks
       .map((d) => `${d.filesystem} ${d.used}/${d.size} (${d.usedPercent}% used, ${d.available} free)`)
       .join("; ");
     const containers = h.containers.length
-      ? h.containers.map((c) => c.name).join(", ")
+      ? h.containers
+          .map((c) => (c.running ? c.name : `${c.name} [STOPPED: ${c.status}]`))
+          .join(", ")
       : "none";
     const mem =
       h.memoryTotalMb && h.memoryUsedMb
@@ -97,7 +99,7 @@ export async function homelabContext(): Promise<string> {
         : "";
 
     return [
-      `- ${h.name} (${h.hostname ?? "?"}): online`,
+      `- ${h.name} (id: ${h.id}, policy: ${(h.policy || "guarded").toUpperCase()}) (${h.hostname ?? "?"}): online`,
       h.uptime ? `, up ${h.uptime}` : "",
       h.loadAvg !== undefined ? `, load ${h.loadAvg}` : "",
       mem,

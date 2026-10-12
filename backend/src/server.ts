@@ -4,11 +4,17 @@ import { routeChat, testProvider, providerHealth, type ChatMessage } from "./aiR
 import { loadSettings, saveSettings, type Settings, type Provider } from "./settingsStore.js";
 import { getHomelabState, loadHosts, saveHosts } from "./connectors/hostRegistry.js";
 import { readHost, type HostConfig } from "./connectors/sshConnector.js";
+import { listActions, approveAction, denyAction } from "./actionEngine.js";
+import {
+  listConversations, createConversation, getConversation,
+  appendMessage, deleteConversation,
+} from "./conversationStore.js";
+import { getMemory, saveMemory } from "./memoryStore.js";
 
 /**
- * HERA backend server — the brain.
- * Episode 1: chat, settings, providers.
- * Episode 2: homelab state + host management.
+ * HERA backend — the brain.
+ * Ep1: chat, settings, providers.  Ep2: homelab sight.
+ * Ep3: conversations, memory, and ACTIONS (propose → approve → execute).
  */
 
 const app = express();
@@ -19,7 +25,7 @@ const PORT = parseInt(process.env.PORT || "8787", 10);
 
 // ── health / status ─────────────────────────────────────────────
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "hera-backend", version: "0.2.0" });
+  res.json({ ok: true, service: "hera-backend", version: "0.3.0" });
 });
 
 app.get("/status", async (_req, res) => {
@@ -27,17 +33,14 @@ app.get("/status", async (_req, res) => {
   res.json({
     appearance: s.appearance,
     providers: s.providers.map((p) => ({
-      id: p.id, name: p.name, model: p.model,
-      enabled: p.enabled, priority: p.priority,
+      id: p.id, name: p.name, model: p.model, enabled: p.enabled, priority: p.priority,
     })),
     health: providerHealth(),
   });
 });
 
 // ── settings ────────────────────────────────────────────────────
-app.get("/settings", async (_req, res) => {
-  res.json(await loadSettings());
-});
+app.get("/settings", async (_req, res) => res.json(await loadSettings()));
 
 app.put("/settings", async (req, res) => {
   try {
@@ -59,9 +62,19 @@ app.post("/providers/test", async (req, res) => {
   res.json(await testProvider(p));
 });
 
-// ── EPISODE 2: homelab ──────────────────────────────────────────
+// ── memory (HERA.md) ────────────────────────────────────────────
+app.get("/memory", async (_req, res) => {
+  res.json({ content: await getMemory() });
+});
 
-/** Current homelab state (cached). ?force=1 to re-scan now. */
+app.put("/memory", async (req, res) => {
+  const content = req.body?.content;
+  if (typeof content !== "string") return res.status(400).json({ error: "Expected { content: string }" });
+  await saveMemory(content);
+  res.json({ ok: true });
+});
+
+// ── homelab ─────────────────────────────────────────────────────
 app.get("/homelab", async (req, res) => {
   try {
     const force = req.query.force === "1" || req.query.force === "true";
@@ -71,19 +84,12 @@ app.get("/homelab", async (req, res) => {
   }
 });
 
-/** Force a fresh read of every host. */
 app.post("/homelab/refresh", async (_req, res) => {
-  try {
-    res.json(await getHomelabState(true));
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
+  try { res.json(await getHomelabState(true)); }
+  catch (err) { res.status(500).json({ error: err instanceof Error ? err.message : String(err) }); }
 });
 
-/** The configured hosts (for the UI). */
-app.get("/hosts", async (_req, res) => {
-  res.json(await loadHosts());
-});
+app.get("/hosts", async (_req, res) => res.json(await loadHosts()));
 
 app.put("/hosts", async (req, res) => {
   try {
@@ -95,7 +101,6 @@ app.put("/hosts", async (req, res) => {
   }
 });
 
-/** Test a single host connection (the "Test" button in the UI). */
 app.post("/hosts/test", async (req, res) => {
   try {
     const host = req.body as HostConfig;
@@ -108,7 +113,77 @@ app.post("/hosts/test", async (req, res) => {
   }
 });
 
-// ── chat ────────────────────────────────────────────────────────
+// ── conversations (Ep3) ─────────────────────────────────────────
+app.get("/conversations", async (_req, res) => res.json(await listConversations()));
+
+app.post("/conversations", async (_req, res) => res.json(await createConversation()));
+
+app.get("/conversations/:id", async (req, res) => {
+  const convo = await getConversation(req.params.id);
+  if (!convo) return res.status(404).json({ error: "Not found" });
+  res.json(convo);
+});
+
+app.delete("/conversations/:id", async (req, res) => {
+  await deleteConversation(req.params.id);
+  res.json({ ok: true });
+});
+
+/** Send a message in a conversation. HERA replies; may attach a pending action. */
+app.post("/conversations/:id/messages", async (req, res) => {
+  try {
+    const content = req.body?.content;
+    if (typeof content !== "string" || !content.trim()) {
+      return res.status(400).json({ error: "Expected { content: string }" });
+    }
+    const convo = await getConversation(req.params.id);
+    if (!convo) return res.status(404).json({ error: "Not found" });
+
+    await appendMessage(convo.id, { role: "user", content });
+
+    // history for the model: user/assistant turns only (tool internals stay internal)
+    const history: ChatMessage[] = convo.messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    history.push({ role: "user", content });
+
+    const result = await routeChat(history);
+
+    const updated = await appendMessage(convo.id, {
+      role: "assistant",
+      content: result.content,
+      pendingActionId: result.pendingAction?.id,
+    });
+
+    res.json({
+      message: updated.messages[updated.messages.length - 1],
+      pendingAction: result.pendingAction || null,
+      provider: result.provider,
+      model: result.model,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[HERA] /conversations message error:", msg);
+    res.status(502).json({ error: msg });
+  }
+});
+
+// ── actions (Ep3: approve / deny) ───────────────────────────────
+app.get("/actions", async (req, res) => {
+  res.json(await listActions(typeof req.query.status === "string" ? req.query.status : undefined));
+});
+
+app.post("/actions/:id/approve", async (req, res) => {
+  try { res.json(await approveAction(req.params.id)); }
+  catch (err) { res.status(400).json({ error: err instanceof Error ? err.message : String(err) }); }
+});
+
+app.post("/actions/:id/deny", async (req, res) => {
+  try { res.json(await denyAction(req.params.id)); }
+  catch (err) { res.status(400).json({ error: err instanceof Error ? err.message : String(err) }); }
+});
+
+// ── legacy stateless chat (kept for curl testing) ───────────────
 app.post("/chat", async (req, res) => {
   try {
     const messages = req.body?.messages as ChatMessage[] | undefined;

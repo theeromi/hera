@@ -10,7 +10,7 @@ services:
     environment:
       - PORT=8787
       # optional seed values (UI overrides these once saved):
-      - LOCAL_AI_BASE_URL=http://192.168.1.100:11434/v1
+      - LOCAL_AI_BASE_URL=http://YOUR-OLLAMA-HOST:11434/v1
       - LOCAL_AI_MODEL=qwen2.5:14b
 
   hera-web:

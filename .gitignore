@@ -24,3 +24,6 @@ Thumbs.db
 .vscode/
 .idea/
 .run/
+*.zip
+.backup-pre-ep3-*/
+.claude/settings.json
